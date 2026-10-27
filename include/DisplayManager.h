@@ -7,11 +7,15 @@
 class DisplayManager {
 private:
   Adafruit_SSD1306 _display;
+  bool _initialized;
 
 public:
   DisplayManager();
 
   bool begin();
+  bool isReady() const;
   void showWelcome();
-  void updateDashboard(int percent, const char* statusMsg, bool pumpActive);
+  void showConnectingWifi(const char* ssid);
+  void showWifiConnected(const char* ip);
+  void updateDashboard(int percent, const char* statusMsg, bool pumpActive, const char* ip = nullptr);
 };

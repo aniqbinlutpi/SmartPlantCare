@@ -15,7 +15,11 @@ public:
 
   void begin();
   bool requestWatering();
-  void update(); // Non-blocking: semak sama ada masa siraman tamat
+  void forceStop();
+  void update(); // Non-blocking timer check
   bool isWatering() const;
   bool canWater() const;
+  unsigned long getRemainingCooldownMs() const;
+  unsigned long getLastWateredTime() const;
+  unsigned long getRunDuration() const;
 };
