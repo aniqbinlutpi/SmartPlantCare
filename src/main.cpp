@@ -10,10 +10,13 @@ int dryThreshold = DEFAULT_DRY_THRESHOLD;
 bool autoWateringEnabled = true;
 
 // Object Instantiations (Clean OOP Architecture)
-SoilSensor     soil(PIN_SOIL_ADC, SOIL_DRY_RAW, SOIL_WET_RAW);
+SoilSensor     soil1(PIN_SOIL_1_ADC, SOIL_DRY_RAW, SOIL_WET_RAW);
+SoilSensor     soil2(PIN_SOIL_2_ADC, SOIL_DRY_RAW, SOIL_WET_RAW);
+SoilSensor     soil3(PIN_SOIL_3_ADC, SOIL_DRY_RAW, SOIL_WET_RAW);
+
 PumpController pump(PIN_RELAY_PUMP, PUMP_RUN_DURATION_MS, WATER_COOLDOWN_MS);
 DisplayManager displayMgr;
-WebManager     webMgr(WEB_SERVER_PORT, soil, pump, dryThreshold, autoWateringEnabled, 
+WebManager     webMgr(WEB_SERVER_PORT, soil1, soil2, soil3, pump, dryThreshold, autoWateringEnabled, 
                       WIFI_SSID, WIFI_PASSWORD, MDNS_HOSTNAME);
 
 unsigned long lastScreenUpdate = 0;
@@ -60,12 +63,20 @@ void loop() {
   // 2. Handle HTTP clients for live web dashboard
   webMgr.handleClient();
 
-  // 3. Read current soil moisture
-  int moisture = soil.getMoisturePercent();
+  // 3. Read current soil moistures & compute average
+  int m1 = soil1.getMoisturePercent();
+  int m2 = soil2.getMoisturePercent();
+  int m3 = soil3.getMoisturePercent();
+  int avgMoisture = (m1 + m2 + m3) / 3;
 
   // 4. Automated Irrigation Logic
-  if (autoWateringEnabled && soil.isDry(dryThreshold) && pump.canWater()) {
-    Serial.println(F("[AUTO-WATER] Soil is dry! Activating pump..."));
+  // Check if any zone is dry OR if average moisture is below threshold
+  bool isAnyDry = soil1.isDry(dryThreshold) || soil2.isDry(dryThreshold) || soil3.isDry(dryThreshold);
+  bool needsWater = (avgMoisture < dryThreshold) || isAnyDry;
+
+  if (autoWateringEnabled && needsWater && pump.canWater()) {
+    Serial.printf("[AUTO-WATER] S1:%d%% S2:%d%% S3:%d%% | AVG:%d%% (Thresh:%d%%). Activating pump...\n",
+                  m1, m2, m3, avgMoisture, dryThreshold);
     pump.requestWatering();
   }
 
@@ -74,14 +85,14 @@ void loop() {
     lastScreenUpdate = millis();
 
     const char* status = "HEALTHY";
-    if (moisture < dryThreshold) {
+    if (needsWater) {
       status = "DRY! NEED WATER";
-    } else if (moisture > 80) {
+    } else if (avgMoisture > 80) {
       status = "VERY WET";
     }
 
     displayMgr.updateDashboard(
-      moisture, 
+      m1, m2, m3, avgMoisture,
       status, 
       pump.isWatering(), 
       webMgr.isConnected() ? webMgr.getLocalIP().c_str() : ""

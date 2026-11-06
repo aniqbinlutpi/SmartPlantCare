@@ -66,7 +66,7 @@ void DisplayManager::showWifiConnected(const char* ip) {
   delay(1500);
 }
 
-void DisplayManager::updateDashboard(int percent, const char* statusMsg, bool pumpActive, const char* ip) {
+void DisplayManager::updateDashboard(int s1, int s2, int s3, int avg, const char* statusMsg, bool pumpActive, const char* ip) {
   if (!_initialized) return;
 
   _display.clearDisplay();
@@ -74,40 +74,52 @@ void DisplayManager::updateDashboard(int percent, const char* statusMsg, bool pu
   // Header Title
   _display.setTextSize(1);
   _display.setTextColor(SSD1306_WHITE);
-  _display.setCursor(4, 2);
-  _display.print(F("SMART PLANT CARE"));
-  _display.drawLine(0, 12, 128, 12, SSD1306_WHITE);
+  _display.setCursor(10, 2);
+  _display.print(F("SMART PLANT CARE (3S)"));
+  _display.drawLine(0, 11, 128, 11, SSD1306_WHITE);
 
-  // Moisture Percent
-  _display.setCursor(4, 18);
-  _display.setTextSize(1);
-  _display.print(F("Soil:"));
-
-  _display.setTextSize(2);
-  _display.setCursor(40, 15);
-  _display.print(percent);
+  // Sensor 1 and Sensor 2
+  _display.setCursor(2, 14);
+  _display.print(F("S1:"));
+  _display.print(s1);
   _display.print(F("%"));
 
-  // Progress Bar
-  _display.drawRect(4, 33, 120, 8, SSD1306_WHITE);
-  int barWidth = map(percent, 0, 100, 0, 116);
+  _display.setCursor(68, 14);
+  _display.print(F("S2:"));
+  _display.print(s2);
+  _display.print(F("%"));
+
+  // Sensor 3 and Average
+  _display.setCursor(2, 25);
+  _display.print(F("S3:"));
+  _display.print(s3);
+  _display.print(F("%"));
+
+  _display.setCursor(68, 25);
+  _display.print(F("AVG:"));
+  _display.print(avg);
+  _display.print(F("%"));
+
+  // Progress Bar for Average Moisture
+  _display.drawRect(2, 36, 124, 7, SSD1306_WHITE);
+  int barWidth = map(constrain(avg, 0, 100), 0, 100, 0, 120);
   if (barWidth > 0) {
-    _display.fillRect(6, 35, barWidth, 4, SSD1306_WHITE);
+    _display.fillRect(4, 38, barWidth, 3, SSD1306_WHITE);
   }
 
-  // Status or IP Bar
+  // Pump / System Status Line
   _display.setTextSize(1);
-  _display.setCursor(4, 45);
+  _display.setCursor(2, 46);
   if (pumpActive) {
     _display.print(F(">> WATERING NOW! <<"));
   } else {
     _display.print(statusMsg);
   }
 
-  // Bottom Line: IP Address if connected
-  _display.setCursor(4, 55);
+  // Bottom Line: IP Address or Offline
+  _display.setCursor(2, 56);
   if (ip != nullptr && strlen(ip) > 0) {
-    _display.print(F("IP: "));
+    _display.print(F("IP:"));
     _display.print(ip);
   } else {
     _display.print(F("Wi-Fi: Disconnected"));

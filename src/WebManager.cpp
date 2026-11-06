@@ -141,6 +141,37 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
     .status-dry { background: rgba(239, 68, 68, 0.2); color: var(--accent-red); }
     .status-wet { background: rgba(56, 189, 248, 0.2); color: var(--accent-blue); }
 
+    .sensor-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+    @media (max-width: 480px) {
+      .sensor-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    .sensor-mini-card {
+      background: #0f172a;
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 12px;
+    }
+    .sensor-mini-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: 0.85rem;
+    }
+    .sensor-mini-val {
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+
     .pump-card-header {
       display: flex;
       align-items: center;
@@ -280,10 +311,10 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
   </header>
 
   <main class="container">
-    <!-- Moisture Sensor Card -->
+    <!-- Average Moisture Sensor Card -->
     <div class="card">
       <div class="card-title">
-        <span>Soil Moisture</span>
+        <span>Average Soil Moisture</span>
         <span id="statusPill" class="status-pill status-healthy">HEALTHY</span>
       </div>
       <div class="moisture-display">
@@ -294,15 +325,65 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
         <div id="progressBar" class="progress-bar-fill"></div>
       </div>
       <div class="meta-row">
-        <span>Raw Sensor ADC: <strong id="rawAdc">--</strong></span>
         <span>Target Threshold: <strong id="currentThreshold">--%</strong></span>
+        <span>Auto-Watering: <strong id="autoWateringBadge">ENABLED</strong></span>
+      </div>
+    </div>
+
+    <!-- 3 Sensors Breakdown Card -->
+    <div class="card">
+      <div class="card-title">
+        <span>Soil Sensors (3 Zones)</span>
+      </div>
+      <div class="sensor-grid">
+        <div class="sensor-mini-card">
+          <div class="sensor-mini-header">
+            <strong>Sensor 1</strong>
+            <span id="s1Pill" class="status-pill status-healthy">OK</span>
+          </div>
+          <div class="sensor-mini-val"><span id="s1Val">--</span>%</div>
+          <div class="progress-bar-bg" style="height: 6px; margin-bottom: 8px;">
+            <div id="s1Bar" class="progress-bar-fill"></div>
+          </div>
+          <div class="meta-row" style="font-size: 0.75rem;">
+            <span>ADC: <strong id="s1Raw">--</strong></span>
+          </div>
+        </div>
+
+        <div class="sensor-mini-card">
+          <div class="sensor-mini-header">
+            <strong>Sensor 2</strong>
+            <span id="s2Pill" class="status-pill status-healthy">OK</span>
+          </div>
+          <div class="sensor-mini-val"><span id="s2Val">--</span>%</div>
+          <div class="progress-bar-bg" style="height: 6px; margin-bottom: 8px;">
+            <div id="s2Bar" class="progress-bar-fill"></div>
+          </div>
+          <div class="meta-row" style="font-size: 0.75rem;">
+            <span>ADC: <strong id="s2Raw">--</strong></span>
+          </div>
+        </div>
+
+        <div class="sensor-mini-card">
+          <div class="sensor-mini-header">
+            <strong>Sensor 3</strong>
+            <span id="s3Pill" class="status-pill status-healthy">OK</span>
+          </div>
+          <div class="sensor-mini-val"><span id="s3Val">--</span>%</div>
+          <div class="progress-bar-bg" style="height: 6px; margin-bottom: 8px;">
+            <div id="s3Bar" class="progress-bar-fill"></div>
+          </div>
+          <div class="meta-row" style="font-size: 0.75rem;">
+            <span>ADC: <strong id="s3Raw">--</strong></span>
+          </div>
+        </div>
       </div>
     </div>
 
     <!-- Pump Control Card -->
     <div class="card">
       <div class="pump-card-header">
-        <span class="card-title" style="margin-bottom:0;">Water Pump</span>
+        <span class="card-title" style="margin-bottom:0;">Water Pump (Shared)</span>
         <div id="pumpState" class="pump-state pump-idle">
           <span id="pumpIcon">💧</span>
           <span id="pumpText">IDLE</span>
@@ -379,22 +460,26 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
         if (!res.ok) throw new Error('Network error');
         const data = await res.json();
 
-        // Update Soil Moisture
-        const m = data.moisture;
-        document.getElementById('moistureVal').innerText = m;
-        document.getElementById('rawAdc').innerText = data.raw;
+        // Update Average Soil Moisture
+        const avg = data.average;
+        document.getElementById('moistureVal').innerText = avg;
         document.getElementById('currentThreshold').innerText = data.threshold + '%';
+        document.getElementById('autoWateringBadge').innerText = data.autoWatering ? 'ENABLED' : 'DISABLED';
         
         const bar = document.getElementById('progressBar');
-        bar.style.width = Math.min(100, Math.max(0, m)) + '%';
+        bar.style.width = Math.min(100, Math.max(0, avg)) + '%';
         
-        // Status pill & colors
         const pill = document.getElementById('statusPill');
-        if (m < data.threshold) {
+        const anyDry = (data.s1.moisture < data.threshold || data.s2.moisture < data.threshold || data.s3.moisture < data.threshold);
+        if (avg < data.threshold) {
           pill.className = 'status-pill status-dry';
-          pill.innerText = 'DRY (NEEDS WATER)';
+          pill.innerText = 'DRY (PUMP NEEDED)';
           bar.style.backgroundColor = 'var(--accent-red)';
-        } else if (m > 80) {
+        } else if (anyDry) {
+          pill.className = 'status-pill status-dry';
+          pill.innerText = 'DRY SPOT DETECTED';
+          bar.style.backgroundColor = 'var(--accent-yellow)';
+        } else if (avg > 80) {
           pill.className = 'status-pill status-wet';
           pill.innerText = 'VERY WET';
           bar.style.backgroundColor = 'var(--accent-blue)';
@@ -403,6 +488,32 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
           pill.innerText = 'HEALTHY';
           bar.style.backgroundColor = 'var(--accent-green)';
         }
+
+        // Helper to update mini sensors
+        function updateMini(id, sData) {
+          document.getElementById(id + 'Val').innerText = sData.moisture;
+          document.getElementById(id + 'Raw').innerText = sData.raw;
+          const sBar = document.getElementById(id + 'Bar');
+          sBar.style.width = Math.min(100, Math.max(0, sData.moisture)) + '%';
+          const sPill = document.getElementById(id + 'Pill');
+          if (sData.moisture < data.threshold) {
+            sPill.className = 'status-pill status-dry';
+            sPill.innerText = 'DRY';
+            sBar.style.backgroundColor = 'var(--accent-red)';
+          } else if (sData.moisture > 80) {
+            sPill.className = 'status-pill status-wet';
+            sPill.innerText = 'WET';
+            sBar.style.backgroundColor = 'var(--accent-blue)';
+          } else {
+            sPill.className = 'status-pill status-healthy';
+            sPill.innerText = 'OK';
+            sBar.style.backgroundColor = 'var(--accent-green)';
+          }
+        }
+
+        updateMini('s1', data.s1);
+        updateMini('s2', data.s2);
+        updateMini('s3', data.s3);
 
         // Pump State
         const btnWater = document.getElementById('btnWater');
@@ -484,7 +595,9 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
 )rawliteral";
 
 WebManager::WebManager(int port, 
-                       SoilSensor& soil, 
+                       SoilSensor& soil1,
+                       SoilSensor& soil2,
+                       SoilSensor& soil3, 
                        PumpController& pump, 
                        int& thresholdRef, 
                        bool& autoWateringRef,
@@ -492,7 +605,9 @@ WebManager::WebManager(int port,
                        const char* password, 
                        const char* hostname)
   : _server(port),
-    _soilSensor(soil),
+    _soil1(soil1),
+    _soil2(soil2),
+    _soil3(soil3),
     _pumpController(pump),
     _threshold(thresholdRef),
     _autoWatering(autoWateringRef),
@@ -572,16 +687,24 @@ void WebManager::handleRoot() {
 }
 
 void WebManager::handleGetStatus() {
-  int moisture = _soilSensor.getMoisturePercent();
-  int rawAdc = _soilSensor.getRawValue();
+  int m1 = _soil1.getMoisturePercent();
+  int m2 = _soil2.getMoisturePercent();
+  int m3 = _soil3.getMoisturePercent();
+  int raw1 = _soil1.getRawValue();
+  int raw2 = _soil2.getRawValue();
+  int raw3 = _soil3.getRawValue();
+  int avg = (m1 + m2 + m3) / 3;
+
   bool isWatering = _pumpController.isWatering();
   unsigned long cooldown = _pumpController.getRemainingCooldownMs();
   int rssi = getRSSI();
   unsigned long uptime = millis() / 1000;
 
   String json = "{";
-  json += "\"moisture\":" + String(moisture) + ",";
-  json += "\"raw\":" + String(rawAdc) + ",";
+  json += "\"s1\":{\"moisture\":" + String(m1) + ",\"raw\":" + String(raw1) + "},";
+  json += "\"s2\":{\"moisture\":" + String(m2) + ",\"raw\":" + String(raw2) + "},";
+  json += "\"s3\":{\"moisture\":" + String(m3) + ",\"raw\":" + String(raw3) + "},";
+  json += "\"average\":" + String(avg) + ",";
   json += "\"pump\":" + String(isWatering ? "true" : "false") + ",";
   json += "\"threshold\":" + String(_threshold) + ",";
   json += "\"autoWatering\":" + String(_autoWatering ? "true" : "false") + ",";

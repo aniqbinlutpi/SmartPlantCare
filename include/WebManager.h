@@ -9,7 +9,9 @@
 class WebManager {
 private:
   WebServer _server;
-  SoilSensor& _soilSensor;
+  SoilSensor& _soil1;
+  SoilSensor& _soil2;
+  SoilSensor& _soil3;
   PumpController& _pumpController;
   int& _threshold;
   bool& _autoWatering;
@@ -26,7 +28,9 @@ private:
 
 public:
   WebManager(int port, 
-             SoilSensor& soil, 
+             SoilSensor& soil1,
+             SoilSensor& soil2,
+             SoilSensor& soil3, 
              PumpController& pump, 
              int& thresholdRef, 
              bool& autoWateringRef,

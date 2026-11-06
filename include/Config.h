@@ -2,7 +2,10 @@
 #include <Arduino.h>
 
 // --- PIN DEFINITIONS ---
-const int PIN_SOIL_ADC   = 34;  // GPIO 34 (ADC1 channel 6 - input only)
+// Uses ADC1 pins exclusively because Wi-Fi is active (ADC2 is unavailable during Wi-Fi)
+const int PIN_SOIL_1_ADC = 34;  // GPIO 34 (ADC1 channel 6 - input only)
+const int PIN_SOIL_2_ADC = 33;  // GPIO 33 (ADC1 channel 5 - input/output capable)
+const int PIN_SOIL_3_ADC = 32;  // GPIO 32 (ADC1 channel 4 - input/output capable)
 const int PIN_RELAY_PUMP = 25;  // GPIO 25 (Digital Output)
 
 // --- SENSOR CALIBRATION ---

@@ -17,5 +17,5 @@ public:
   void showWelcome();
   void showConnectingWifi(const char* ssid);
   void showWifiConnected(const char* ip);
-  void updateDashboard(int percent, const char* statusMsg, bool pumpActive, const char* ip = nullptr);
+  void updateDashboard(int s1, int s2, int s3, int avg, const char* statusMsg, bool pumpActive, const char* ip = nullptr);
 };
