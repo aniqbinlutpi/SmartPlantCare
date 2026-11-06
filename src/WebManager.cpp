@@ -155,8 +155,13 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
       background: #0f172a;
       border: 1px solid var(--card-border);
       border-radius: 12px;
-      padding: 12px;
+      padding: 14px 12px;
+      position: relative;
     }
+    .sensor-card-blue { border-top: 4px solid #38bdf8; }
+    .sensor-card-yellow { border-top: 4px solid #facc15; }
+    .sensor-card-red { border-top: 4px solid #ef4444; }
+
     .sensor-mini-header {
       display: flex;
       justify-content: space-between;
@@ -164,10 +169,40 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
       margin-bottom: 8px;
       font-size: 0.85rem;
     }
+    .sensor-title-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .sensor-icon-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+    .dot-blue { background: #38bdf8; box-shadow: 0 0 8px rgba(56, 189, 248, 0.7); }
+    .dot-yellow { background: #facc15; box-shadow: 0 0 8px rgba(250, 204, 21, 0.7); }
+    .dot-red { background: #ef4444; box-shadow: 0 0 8px rgba(239, 68, 68, 0.7); }
+
+    .color-pill {
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 1px 6px;
+      border-radius: 4px;
+      letter-spacing: 0.05em;
+    }
+    .pill-blue { background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); }
+    .pill-yellow { background: rgba(250, 204, 21, 0.15); color: #facc15; border: 1px solid rgba(250, 204, 21, 0.3); }
+    .pill-red { background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); }
+
+    .bar-blue { background: #38bdf8; }
+    .bar-yellow { background: #facc15; }
+    .bar-red { background: #ef4444; }
+
     .sensor-mini-val {
       font-size: 1.8rem;
       font-weight: 700;
-      color: var(--text);
       line-height: 1;
       margin-bottom: 8px;
     }
@@ -336,42 +371,57 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
         <span>Soil Sensors (3 Zones)</span>
       </div>
       <div class="sensor-grid">
-        <div class="sensor-mini-card">
+        <!-- Sensor 1: Biru -->
+        <div class="sensor-mini-card sensor-card-blue">
           <div class="sensor-mini-header">
-            <strong>Sensor 1</strong>
+            <div class="sensor-title-group">
+              <span class="sensor-icon-dot dot-blue"></span>
+              <strong>Sensor 1</strong>
+              <span class="color-pill pill-blue">Biru</span>
+            </div>
             <span id="s1Pill" class="status-pill status-healthy">OK</span>
           </div>
-          <div class="sensor-mini-val"><span id="s1Val">--</span>%</div>
+          <div class="sensor-mini-val" style="color: #38bdf8;"><span id="s1Val">--</span>%</div>
           <div class="progress-bar-bg" style="height: 6px; margin-bottom: 8px;">
-            <div id="s1Bar" class="progress-bar-fill"></div>
+            <div id="s1Bar" class="progress-bar-fill bar-blue"></div>
           </div>
           <div class="meta-row" style="font-size: 0.75rem;">
             <span>ADC: <strong id="s1Raw">--</strong></span>
           </div>
         </div>
 
-        <div class="sensor-mini-card">
+        <!-- Sensor 2: Kuning -->
+        <div class="sensor-mini-card sensor-card-yellow">
           <div class="sensor-mini-header">
-            <strong>Sensor 2</strong>
+            <div class="sensor-title-group">
+              <span class="sensor-icon-dot dot-yellow"></span>
+              <strong>Sensor 2</strong>
+              <span class="color-pill pill-yellow">Kuning</span>
+            </div>
             <span id="s2Pill" class="status-pill status-healthy">OK</span>
           </div>
-          <div class="sensor-mini-val"><span id="s2Val">--</span>%</div>
+          <div class="sensor-mini-val" style="color: #facc15;"><span id="s2Val">--</span>%</div>
           <div class="progress-bar-bg" style="height: 6px; margin-bottom: 8px;">
-            <div id="s2Bar" class="progress-bar-fill"></div>
+            <div id="s2Bar" class="progress-bar-fill bar-yellow"></div>
           </div>
           <div class="meta-row" style="font-size: 0.75rem;">
             <span>ADC: <strong id="s2Raw">--</strong></span>
           </div>
         </div>
 
-        <div class="sensor-mini-card">
+        <!-- Sensor 3: Merah -->
+        <div class="sensor-mini-card sensor-card-red">
           <div class="sensor-mini-header">
-            <strong>Sensor 3</strong>
+            <div class="sensor-title-group">
+              <span class="sensor-icon-dot dot-red"></span>
+              <strong>Sensor 3</strong>
+              <span class="color-pill pill-red">Merah</span>
+            </div>
             <span id="s3Pill" class="status-pill status-healthy">OK</span>
           </div>
-          <div class="sensor-mini-val"><span id="s3Val">--</span>%</div>
+          <div class="sensor-mini-val" style="color: #ef4444;"><span id="s3Val">--</span>%</div>
           <div class="progress-bar-bg" style="height: 6px; margin-bottom: 8px;">
-            <div id="s3Bar" class="progress-bar-fill"></div>
+            <div id="s3Bar" class="progress-bar-fill bar-red"></div>
           </div>
           <div class="meta-row" style="font-size: 0.75rem;">
             <span>ADC: <strong id="s3Raw">--</strong></span>
@@ -490,30 +540,29 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
         }
 
         // Helper to update mini sensors
-        function updateMini(id, sData) {
+        function updateMini(id, sData, baseColor) {
           document.getElementById(id + 'Val').innerText = sData.moisture;
           document.getElementById(id + 'Raw').innerText = sData.raw;
           const sBar = document.getElementById(id + 'Bar');
           sBar.style.width = Math.min(100, Math.max(0, sData.moisture)) + '%';
+          sBar.style.backgroundColor = baseColor;
+
           const sPill = document.getElementById(id + 'Pill');
           if (sData.moisture < data.threshold) {
             sPill.className = 'status-pill status-dry';
             sPill.innerText = 'DRY';
-            sBar.style.backgroundColor = 'var(--accent-red)';
           } else if (sData.moisture > 80) {
             sPill.className = 'status-pill status-wet';
             sPill.innerText = 'WET';
-            sBar.style.backgroundColor = 'var(--accent-blue)';
           } else {
             sPill.className = 'status-pill status-healthy';
             sPill.innerText = 'OK';
-            sBar.style.backgroundColor = 'var(--accent-green)';
           }
         }
 
-        updateMini('s1', data.s1);
-        updateMini('s2', data.s2);
-        updateMini('s3', data.s3);
+        updateMini('s1', data.s1, '#38bdf8');
+        updateMini('s2', data.s2, '#facc15');
+        updateMini('s3', data.s3, '#ef4444');
 
         // Pump State
         const btnWater = document.getElementById('btnWater');
