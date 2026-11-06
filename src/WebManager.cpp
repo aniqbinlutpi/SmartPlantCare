@@ -361,7 +361,8 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
       </div>
       <div class="meta-row">
         <span>Target Threshold: <strong id="currentThreshold">--%</strong></span>
-        <span>Auto-Watering: <strong id="autoWateringBadge">ENABLED</strong></span>
+        <span>Anti-Rot Limit: <strong id="overwaterLimitDisplay">85%</strong></span>
+        <span>Auto: <strong id="autoWateringBadge">ENABLED</strong></span>
       </div>
     </div>
 
@@ -514,6 +515,9 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
         const avg = data.average;
         document.getElementById('moistureVal').innerText = avg;
         document.getElementById('currentThreshold').innerText = data.threshold + '%';
+        if (data.overwaterLimit) {
+          document.getElementById('overwaterLimitDisplay').innerText = data.overwaterLimit + '%';
+        }
         document.getElementById('autoWateringBadge').innerText = data.autoWatering ? 'ENABLED' : 'DISABLED';
         
         const bar = document.getElementById('progressBar');
@@ -521,7 +525,11 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
         
         const pill = document.getElementById('statusPill');
         const anyDry = (data.s1.moisture < data.threshold || data.s2.moisture < data.threshold || data.s3.moisture < data.threshold);
-        if (avg < data.threshold) {
+        if (data.overwaterLocked) {
+          pill.className = 'status-pill status-wet';
+          pill.innerText = 'OVERWATER SAFEGUARD ACTIVE';
+          bar.style.backgroundColor = 'var(--accent-blue)';
+        } else if (avg < data.threshold) {
           pill.className = 'status-pill status-dry';
           pill.innerText = 'DRY (PUMP NEEDED)';
           bar.style.backgroundColor = 'var(--accent-red)';
@@ -529,13 +537,9 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
           pill.className = 'status-pill status-dry';
           pill.innerText = 'DRY SPOT DETECTED';
           bar.style.backgroundColor = 'var(--accent-yellow)';
-        } else if (avg > 80) {
-          pill.className = 'status-pill status-wet';
-          pill.innerText = 'VERY WET';
-          bar.style.backgroundColor = 'var(--accent-blue)';
         } else {
           pill.className = 'status-pill status-healthy';
-          pill.innerText = 'HEALTHY';
+          pill.innerText = 'HEALTHY & BALANCED';
           bar.style.backgroundColor = 'var(--accent-green)';
         }
 
@@ -579,13 +583,15 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
           pumpText.innerText = 'IDLE';
           pumpState.className = 'pump-state pump-idle';
 
-          if (data.cooldownRemainingMs > 0) {
+          if (data.overwaterLocked) {
+            cooldownText.innerHTML = '<span style="color:var(--accent-yellow);">⚠️ Anti-Rot Guard: Auto-pump paused because one pot is ≥ ' + data.overwaterLimit + '% wet.</span>';
+          } else if (data.cooldownRemainingMs > 0) {
             const secsLeft = Math.ceil(data.cooldownRemainingMs / 1000);
             btnWater.disabled = true;
             cooldownText.innerText = `Cooldown active: ${secsLeft}s remaining`;
           } else {
             btnWater.disabled = false;
-            cooldownText.innerText = 'Ready for watering';
+            cooldownText.innerText = 'Ready for balanced watering';
           }
         }
 
@@ -650,6 +656,7 @@ WebManager::WebManager(int port,
                        PumpController& pump, 
                        int& thresholdRef, 
                        bool& autoWateringRef,
+                       int overwaterLimit,
                        const char* ssid, 
                        const char* password, 
                        const char* hostname)
@@ -660,6 +667,7 @@ WebManager::WebManager(int port,
     _pumpController(pump),
     _threshold(thresholdRef),
     _autoWatering(autoWateringRef),
+    _overwaterLimit(overwaterLimit),
     _ssid(ssid),
     _password(password),
     _hostname(hostname),
@@ -744,6 +752,7 @@ void WebManager::handleGetStatus() {
   int raw3 = _soil3.getRawValue();
   int avg = (m1 + m2 + m3) / 3;
 
+  bool isOverwaterLocked = (m1 >= _overwaterLimit || m2 >= _overwaterLimit || m3 >= _overwaterLimit);
   bool isWatering = _pumpController.isWatering();
   unsigned long cooldown = _pumpController.getRemainingCooldownMs();
   int rssi = getRSSI();
@@ -757,6 +766,8 @@ void WebManager::handleGetStatus() {
   json += "\"pump\":" + String(isWatering ? "true" : "false") + ",";
   json += "\"threshold\":" + String(_threshold) + ",";
   json += "\"autoWatering\":" + String(_autoWatering ? "true" : "false") + ",";
+  json += "\"overwaterLimit\":" + String(_overwaterLimit) + ",";
+  json += "\"overwaterLocked\":" + String(isOverwaterLocked ? "true" : "false") + ",";
   json += "\"cooldownRemainingMs\":" + String(cooldown) + ",";
   json += "\"wifiRssi\":" + String(rssi) + ",";
   json += "\"uptimeSec\":" + String(uptime);

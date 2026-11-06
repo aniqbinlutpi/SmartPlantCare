@@ -15,6 +15,7 @@ private:
   PumpController& _pumpController;
   int& _threshold;
   bool& _autoWatering;
+  int _overwaterLimit;
   const char* _ssid;
   const char* _password;
   const char* _hostname;
@@ -34,6 +35,7 @@ public:
              PumpController& pump, 
              int& thresholdRef, 
              bool& autoWateringRef,
+             int overwaterLimit,
              const char* ssid, 
              const char* password, 
              const char* hostname);
