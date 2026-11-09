@@ -1,0 +1,11 @@
+{
+  "name": "smartplantcare-bridge",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Password-protected bridge between the ESP32 plant controller and the public portfolio dashboard.",
+  "engines": { "node": ">=20.12" },
+  "scripts": {
+    "start": "node server.mjs"
+  }
+}
