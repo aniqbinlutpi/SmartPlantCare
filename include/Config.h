@@ -33,8 +33,9 @@ const unsigned long PUMP_RUN_DURATION_MS = 2500;   // Pump run duration: 2.5 sec
 const unsigned long WATER_COOLDOWN_MS    = 15000;  // Cooldown time: 15 seconds before next watering
 
 // --- WI-FI & WEB DASHBOARD ---
-// Replace with your local Wi-Fi credentials
-const char* WIFI_SSID     = "RumohTepiSejid_2.4GHz";
-const char* WIFI_PASSWORD = "Abepi611_";
+// Wi-Fi credentials live in include/secrets.h (gitignored).
+// Copy include/secrets.example.h -> include/secrets.h and fill in your values.
+#include "secrets.h"
+
 const char* MDNS_HOSTNAME = "plantcare";  // Access via http://plantcare.local
 const int   WEB_SERVER_PORT = 80;
