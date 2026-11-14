@@ -671,13 +671,20 @@ WebManager::WebManager(int port,
     _ssid(ssid),
     _password(password),
     _hostname(hostname),
-    _wifiConnected(false) {}
+    _wifiConnected(false),
+    _lastWifiRetry(0),
+    _lastRssiLog(0) {}
 
 bool WebManager::begin() {
   Serial.print(F("Connecting to Wi-Fi: "));
   Serial.println(_ssid);
 
   WiFi.mode(WIFI_STA);
+  // Keep the radio awake. Modem sleep (the default) adds seconds of latency
+  // and packet loss on a weak signal, so the bridge sees the board as offline.
+  // The board runs on USB power, so the extra current doesn't matter.
+  WiFi.setSleep(false);
+  WiFi.setAutoReconnect(true);
   WiFi.begin(_ssid, _password);
 
   // Attempt connection with 15-second timeout (non-freezing)
@@ -718,7 +725,45 @@ bool WebManager::begin() {
 }
 
 void WebManager::handleClient() {
+  maintainWifi();
   _server.handleClient();
+}
+
+// Keeps the board online without blocking the loop: retries every 10s if the
+// first connect timed out or the link dropped (router reboot, weak signal),
+// and logs RSSI every 30s to help find a better spot for the board.
+void WebManager::maintainWifi() {
+  const unsigned long now = millis();
+
+  if (WiFi.status() == WL_CONNECTED) {
+    if (!_wifiConnected) {
+      _wifiConnected = true;
+      Serial.printf("[WIFI] Connected: %s (RSSI %d dBm)\n",
+                    WiFi.localIP().toString().c_str(), WiFi.RSSI());
+      MDNS.end();
+      if (MDNS.begin(_hostname)) {
+        MDNS.addService("http", "tcp", 80);
+      }
+    }
+    if (now - _lastRssiLog >= 30000) {
+      _lastRssiLog = now;
+      Serial.printf("[WIFI] RSSI %d dBm\n", WiFi.RSSI());
+    }
+    return;
+  }
+
+  if (_wifiConnected) {
+    _wifiConnected = false;
+    _lastWifiRetry = now;
+    Serial.println(F("[WIFI] Connection lost. Retrying every 10s..."));
+  }
+
+  if (now - _lastWifiRetry >= 10000) {
+    _lastWifiRetry = now;
+    Serial.println(F("[WIFI] Reconnecting..."));
+    WiFi.disconnect();
+    WiFi.begin(_ssid, _password);
+  }
 }
 
 bool WebManager::isConnected() const {

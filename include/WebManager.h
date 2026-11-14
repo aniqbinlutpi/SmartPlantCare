@@ -20,12 +20,15 @@ private:
   const char* _password;
   const char* _hostname;
   bool _wifiConnected;
+  unsigned long _lastWifiRetry;
+  unsigned long _lastRssiLog;
 
   void handleRoot();
   void handleGetStatus();
   void handlePostWater();
   void handlePostSettings();
   void handleNotFound();
+  void maintainWifi();
 
 public:
   WebManager(int port, 
