@@ -1,0 +1,23 @@
+# /etc/systemd/system/plant-bridge.service
+# Adjust User and the paths, then:
+#   sudo systemctl daemon-reload && sudo systemctl enable --now plant-bridge
+
+[Unit]
+Description=SmartPlantCare bridge (ESP32 -> portfolio)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=YOUR_USER
+WorkingDirectory=/opt/SmartPlantCare/bridge
+ExecStart=/usr/bin/node /opt/SmartPlantCare/bridge/server.mjs
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

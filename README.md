@@ -157,6 +157,15 @@ When the ESP32 boots, it connects to your local 2.4 GHz Wi-Fi network and starts
 
 ---
 
+## 🌍 Remote Dashboard (own domain)
+
+The local dashboard only works on your Wi-Fi. To monitor and water from anywhere, run the
+[`bridge/`](bridge/README.md) on a home server and expose it through a Cloudflare Tunnel.
+The public dashboard lives in the portfolio at `/projects/smart-plant`: anyone can watch,
+and only the owner can water (password in `bridge/.env`).
+
+---
+
 ## 📁 Project Structure
 
 This project follows the industry-standard **PlatformIO / Embedded C++** project layout:

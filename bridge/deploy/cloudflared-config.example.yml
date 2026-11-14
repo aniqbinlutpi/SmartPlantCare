@@ -1,0 +1,14 @@
+# Add this ingress rule to your existing cloudflared config
+# (usually /etc/cloudflared/config.yml), ABOVE the final catch-all rule.
+# Then create the DNS record once:
+#   cloudflared tunnel route dns <TUNNEL_NAME> plant-api.aniqbinlutpi.my
+#   sudo systemctl restart cloudflared
+
+tunnel: <TUNNEL_ID>
+credentials-file: /etc/cloudflared/<TUNNEL_ID>.json
+
+ingress:
+  - hostname: plant-api.aniqbinlutpi.my
+    service: http://127.0.0.1:8787
+  # ... your existing portfolio rule(s) ...
+  - service: http_status:404
