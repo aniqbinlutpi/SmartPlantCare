@@ -671,13 +671,20 @@ WebManager::WebManager(int port,
     _ssid(ssid),
     _password(password),
     _hostname(hostname),
-    _wifiConnected(false) {}
+    _wifiConnected(false),
+    _lastWifiRetry(0),
+    _lastRssiLog(0) {}
 
 bool WebManager::begin() {
   Serial.print(F("Connecting to Wi-Fi: "));
   Serial.println(_ssid);
 
   WiFi.mode(WIFI_STA);
+  // Keep the radio awake. Modem sleep (the default) adds seconds of latency
+  // and packet loss on a weak signal, so the bridge sees the board as offline.
+  // The board runs on USB power, so the extra current doesn't matter.
+  WiFi.setSleep(false);
+  WiFi.setAutoReconnect(true);
   WiFi.begin(_ssid, _password);
 
   // Attempt connection with 15-second timeout (non-freezing)
@@ -718,7 +725,45 @@ bool WebManager::begin() {
 }
 
 void WebManager::handleClient() {
+  maintainWifi();
   _server.handleClient();
+}
+
+// Keeps the board online without blocking the loop: retries every 10s if the
+// first connect timed out or the link dropped (router reboot, weak signal),
+// and logs RSSI every 30s to help find a better spot for the board.
+void WebManager::maintainWifi() {
+  const unsigned long now = millis();
+
+  if (WiFi.status() == WL_CONNECTED) {
+    if (!_wifiConnected) {
+      _wifiConnected = true;
+      Serial.printf("[WIFI] Connected: %s (RSSI %d dBm)\n",
+                    WiFi.localIP().toString().c_str(), WiFi.RSSI());
+      MDNS.end();
+      if (MDNS.begin(_hostname)) {
+        MDNS.addService("http", "tcp", 80);
+      }
+    }
+    if (now - _lastRssiLog >= 30000) {
+      _lastRssiLog = now;
+      Serial.printf("[WIFI] RSSI %d dBm\n", WiFi.RSSI());
+    }
+    return;
+  }
+
+  if (_wifiConnected) {
+    _wifiConnected = false;
+    _lastWifiRetry = now;
+    Serial.println(F("[WIFI] Connection lost. Retrying every 10s..."));
+  }
+
+  if (now - _lastWifiRetry >= 10000) {
+    _lastWifiRetry = now;
+    Serial.println(F("[WIFI] Reconnecting..."));
+    WiFi.disconnect();
+    WiFi.begin(_ssid, _password);
+  }
 }
 
 bool WebManager::isConnected() const {
@@ -770,6 +815,7 @@ void WebManager::handleGetStatus() {
   json += "\"overwaterLocked\":" + String(isOverwaterLocked ? "true" : "false") + ",";
   json += "\"cooldownRemainingMs\":" + String(cooldown) + ",";
   json += "\"wifiRssi\":" + String(rssi) + ",";
+  json += "\"pumpDurationMs\":" + String(_pumpController.getRunDuration()) + ",";
   json += "\"uptimeSec\":" + String(uptime);
   json += "}";
 
@@ -805,8 +851,17 @@ void WebManager::handlePostSettings() {
     _autoWatering = (autoVal == 1);
   }
 
+  // Pump burst length in ms; out-of-range values are ignored like threshold.
+  if (_server.hasArg("duration")) {
+    long ms = _server.arg("duration").toInt();
+    if (ms > 0) {
+      _pumpController.setRunDuration((unsigned long)ms);
+    }
+  }
+
   String json = "{\"success\":true,\"threshold\":" + String(_threshold) + 
-                ",\"autoWatering\":" + String(_autoWatering ? "true" : "false") + "}";
+                ",\"autoWatering\":" + String(_autoWatering ? "true" : "false") +
+                ",\"pumpDurationMs\":" + String(_pumpController.getRunDuration()) + "}";
 
   _server.sendHeader("Access-Control-Allow-Origin", "*");
   _server.send(200, "application/json", json);

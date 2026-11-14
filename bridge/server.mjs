@@ -285,6 +285,14 @@ async function handle(req, res) {
       }
       params.set("auto", input.autoWatering ? "1" : "0");
     }
+    if (input.pumpDurationMs !== undefined) {
+      // Must match PumpController::MIN_RUN_MS / MAX_RUN_MS in the firmware.
+      const ms = Number(input.pumpDurationMs);
+      if (!Number.isInteger(ms) || ms < 1000 || ms > 10000) {
+        return send(res, 400, { error: "pumpDurationMs must be an integer between 1000 and 10000" });
+      }
+      params.set("duration", String(ms));
+    }
     if (![...params.keys()].length) {
       return send(res, 400, { error: "Nothing to update" });
     }

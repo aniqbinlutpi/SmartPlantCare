@@ -13,8 +13,12 @@ Browser ──HTTPS──▶ Cloudflare ──tunnel──▶ home server :8787 
 - Status is cached for 1.5s so many visitors don't overload the ESP32's single-threaded web server.
 - If the ESP32 goes offline, the page shows the last reading plus "last seen".
 
-The firmware's own safety rules (2.5s pump burst, 15s cooldown, anti-rot lock at 85%) still apply,
-so even the owner can't overwater from the page.
+The firmware still enforces its own limits: each burst is 1–10s (2.5s by default, adjustable from the
+page) followed by a 15s cooldown. The 85% anti-rot lock only blocks **auto**-watering; a manual
+"Water now" is only limited by the cooldown, so keep the password private.
+
+Settings changed from the page (threshold, auto, burst length) reset to the `Config.h` defaults
+when the ESP32 reboots.
 
 ## API
 
@@ -23,7 +27,7 @@ so even the owner can't overwater from the page.
 | GET | `/status` | – | – |
 | POST | `/auth` | ✓ | – (just checks the password) |
 | POST | `/water` | ✓ | – |
-| POST | `/settings` | ✓ | `{ "threshold"?: 5–95, "autoWatering"?: boolean }` |
+| POST | `/settings` | ✓ | `{ "threshold"?: 5–95, "autoWatering"?: boolean, "pumpDurationMs"?: 1000–10000 }` |
 
 Paths also work with an `/api/plant` prefix, in case you prefer to route it through nginx instead of a subdomain.
 
