@@ -67,3 +67,9 @@ unsigned long PumpController::getLastWateredTime() const {
 unsigned long PumpController::getRunDuration() const {
   return _runDuration;
 }
+
+bool PumpController::setRunDuration(unsigned long ms) {
+  if (ms < MIN_RUN_MS || ms > MAX_RUN_MS) return false;
+  _runDuration = ms;
+  return true;
+}

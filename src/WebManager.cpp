@@ -815,6 +815,7 @@ void WebManager::handleGetStatus() {
   json += "\"overwaterLocked\":" + String(isOverwaterLocked ? "true" : "false") + ",";
   json += "\"cooldownRemainingMs\":" + String(cooldown) + ",";
   json += "\"wifiRssi\":" + String(rssi) + ",";
+  json += "\"pumpDurationMs\":" + String(_pumpController.getRunDuration()) + ",";
   json += "\"uptimeSec\":" + String(uptime);
   json += "}";
 
@@ -850,8 +851,17 @@ void WebManager::handlePostSettings() {
     _autoWatering = (autoVal == 1);
   }
 
+  // Pump burst length in ms; out-of-range values are ignored like threshold.
+  if (_server.hasArg("duration")) {
+    long ms = _server.arg("duration").toInt();
+    if (ms > 0) {
+      _pumpController.setRunDuration((unsigned long)ms);
+    }
+  }
+
   String json = "{\"success\":true,\"threshold\":" + String(_threshold) + 
-                ",\"autoWatering\":" + String(_autoWatering ? "true" : "false") + "}";
+                ",\"autoWatering\":" + String(_autoWatering ? "true" : "false") +
+                ",\"pumpDurationMs\":" + String(_pumpController.getRunDuration()) + "}";
 
   _server.sendHeader("Access-Control-Allow-Origin", "*");
   _server.send(200, "application/json", json);
