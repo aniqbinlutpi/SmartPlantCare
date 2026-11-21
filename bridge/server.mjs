@@ -24,8 +24,14 @@ const config = {
     .split(",")
     .map((o) => o.trim())
     .filter(Boolean),
-  esp32TimeoutMs: Number(process.env.ESP32_TIMEOUT_MS || 3000),
+  esp32TimeoutMs: Number(process.env.ESP32_TIMEOUT_MS || 5000),
   statusCacheMs: Number(process.env.STATUS_CACHE_MS || 1500),
+  // Poll the ESP32 on a timer even when nobody has the page open. Keeps the
+  // Wi-Fi link warm and feeds the firmware's link watchdog. 0 disables it.
+  keepaliveMs: Number(process.env.KEEPALIVE_MS ?? 15000),
+  // Report "online" if the board answered within this window, so a single
+  // missed poll on a flaky link doesn't flip the page to Offline.
+  onlineGraceMs: Number(process.env.ONLINE_GRACE_MS || 45000),
 };
 
 if (!config.esp32Url) {
@@ -233,7 +239,7 @@ async function handle(req, res) {
   if (req.method === "GET" && route === "/status") {
     const status = await getStatus();
     return send(res, 200, {
-      online: status.online,
+      online: lastOnlineAt !== null && Date.now() - lastOnlineAt <= config.onlineGraceMs,
       lastSeen: lastOnlineAt ? new Date(lastOnlineAt).toISOString() : null,
       data: status.data,
     });
@@ -315,6 +321,12 @@ const server = http.createServer((req, res) => {
     if (!res.headersSent) send(res, 500, { error: "Internal error" });
   });
 });
+
+if (config.keepaliveMs > 0) {
+  setInterval(() => {
+    getStatus().catch(() => {});
+  }, config.keepaliveMs);
+}
 
 server.listen(config.port, config.host, () => {
   console.log(`[bridge] listening on http://${config.host}:${config.port} -> ${config.esp32Url}`);
