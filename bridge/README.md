@@ -12,6 +12,11 @@ Browser ──HTTPS──▶ Cloudflare ──tunnel──▶ home server :8787 
 - 5 wrong passwords from one IP → blocked for 15 minutes (uses Cloudflare's `CF-Connecting-IP`).
 - Status is cached for 1.5s so many visitors don't overload the ESP32's single-threaded web server.
 - If the ESP32 goes offline, the page shows the last reading plus "last seen".
+- Polls the ESP32 every 15s even with no visitors (`KEEPALIVE_MS`). This keeps the Wi-Fi link
+  warm and feeds the firmware's link watchdog: if the ESP32 gets no request for 2 minutes it
+  forces a Wi-Fi reconnect, and after 15 minutes it reboots itself.
+- Reports "online" if the ESP32 answered in the last 45s (`ONLINE_GRACE_MS`), so one missed
+  poll on a weak link doesn't flip the page to Offline.
 
 The firmware still enforces its own limits: each burst is 1–10s (2.5s by default, adjustable from the
 page) followed by a 15s cooldown. The 85% anti-rot lock only blocks **auto**-watering; a manual

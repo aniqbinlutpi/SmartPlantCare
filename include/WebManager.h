@@ -3,6 +3,7 @@
 #include <WiFi.h>
 #include <WebServer.h>
 #include <ESPmDNS.h>
+#include <Preferences.h>
 #include "SoilSensor.h"
 #include "PumpController.h"
 
@@ -22,6 +23,9 @@ private:
   bool _wifiConnected;
   unsigned long _lastWifiRetry;
   unsigned long _lastRssiLog;
+  unsigned long _lastRequestMs;   // last HTTP request served (link watchdog)
+  unsigned long _lastHealMs;      // last forced reconnect
+  Preferences _prefs;
 
   void handleRoot();
   void handleGetStatus();
@@ -29,6 +33,8 @@ private:
   void handlePostSettings();
   void handleNotFound();
   void maintainWifi();
+  void markActivity();
+  void saveSettings();
 
 public:
   WebManager(int port, 
@@ -44,6 +50,7 @@ public:
              const char* hostname);
 
   bool begin();
+  void loadSettings(); // restore dashboard settings saved in flash
   void handleClient();
   bool isConnected() const;
   String getLocalIP() const;
