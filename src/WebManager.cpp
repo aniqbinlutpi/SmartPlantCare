@@ -649,6 +649,25 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
 </html>
 )rawliteral";
 
+// Link watchdog thresholds (see maintainWifi)
+static const unsigned long LINK_IDLE_RECONNECT_MS = 2UL * 60UL * 1000UL;   // 2 min
+static const unsigned long LINK_IDLE_REBOOT_MS    = 15UL * 60UL * 1000UL;  // 15 min
+
+static const char* resetReasonName() {
+  switch (esp_reset_reason()) {
+    case ESP_RST_POWERON:  return "power-on";
+    case ESP_RST_SW:       return "software";
+    case ESP_RST_PANIC:    return "crash";
+    case ESP_RST_INT_WDT:
+    case ESP_RST_TASK_WDT:
+    case ESP_RST_WDT:      return "watchdog";
+    case ESP_RST_BROWNOUT: return "brownout";
+    case ESP_RST_DEEPSLEEP:return "deep-sleep";
+    case ESP_RST_EXT:      return "reset-pin";
+    default:               return "other";
+  }
+}
+
 WebManager::WebManager(int port, 
                        SoilSensor& soil1,
                        SoilSensor& soil2,
@@ -673,7 +692,9 @@ WebManager::WebManager(int port,
     _hostname(hostname),
     _wifiConnected(false),
     _lastWifiRetry(0),
-    _lastRssiLog(0) {}
+    _lastRssiLog(0),
+    _lastRequestMs(0),
+    _lastHealMs(0) {}
 
 bool WebManager::begin() {
   Serial.print(F("Connecting to Wi-Fi: "));
@@ -720,6 +741,7 @@ bool WebManager::begin() {
   _server.onNotFound([this]() { handleNotFound(); });
 
   _server.begin();
+  _lastRequestMs = millis();
   Serial.println(F("HTTP Web Server started."));
   return _wifiConnected;
 }
@@ -749,6 +771,25 @@ void WebManager::maintainWifi() {
       _lastRssiLog = now;
       Serial.printf("[WIFI] RSSI %d dBm\n", WiFi.RSSI());
     }
+
+    // Link watchdog. The bridge polls every ~15s, so a long silence means the
+    // link is dead even though WiFi.status() still says connected (the router
+    // dropped us without the ESP32 noticing). Re-associate first; if that
+    // doesn't help, reboot. Settings survive the reboot (saved in flash).
+    const unsigned long idle = now - _lastRequestMs;
+    if (idle >= LINK_IDLE_REBOOT_MS && !_pumpController.isWatering()) {
+      Serial.printf("[WIFI] No requests for %lus. Rebooting to recover.\n", idle / 1000);
+      delay(200);
+      ESP.restart();
+    }
+    if (idle >= LINK_IDLE_RECONNECT_MS && now - _lastHealMs >= LINK_IDLE_RECONNECT_MS) {
+      _lastHealMs = now;
+      _lastWifiRetry = now;
+      _wifiConnected = false;
+      Serial.printf("[WIFI] No requests for %lus. Forcing a reconnect.\n", idle / 1000);
+      WiFi.disconnect();
+      WiFi.begin(_ssid, _password);
+    }
     return;
   }
 
@@ -764,6 +805,32 @@ void WebManager::maintainWifi() {
     WiFi.disconnect();
     WiFi.begin(_ssid, _password);
   }
+}
+
+void WebManager::markActivity() {
+  _lastRequestMs = millis();
+}
+
+void WebManager::loadSettings() {
+  _prefs.begin("plant", true);
+  int t = _prefs.getInt("thr", _threshold);
+  bool a = _prefs.getBool("auto", _autoWatering);
+  unsigned long d = _prefs.getULong("dur", _pumpController.getRunDuration());
+  _prefs.end();
+
+  if (t >= 5 && t <= 95) _threshold = t;
+  _autoWatering = a;
+  _pumpController.setRunDuration(d);  // ignored if outside the safe range
+  Serial.printf("[SETTINGS] threshold=%d%% auto=%s burst=%lums\n",
+                _threshold, _autoWatering ? "on" : "off", _pumpController.getRunDuration());
+}
+
+void WebManager::saveSettings() {
+  _prefs.begin("plant", false);
+  _prefs.putInt("thr", _threshold);
+  _prefs.putBool("auto", _autoWatering);
+  _prefs.putULong("dur", _pumpController.getRunDuration());
+  _prefs.end();
 }
 
 bool WebManager::isConnected() const {
@@ -785,10 +852,12 @@ int WebManager::getRSSI() const {
 }
 
 void WebManager::handleRoot() {
+  markActivity();
   _server.send_P(200, "text/html", INDEX_HTML);
 }
 
 void WebManager::handleGetStatus() {
+  markActivity();
   int m1 = _soil1.getMoisturePercent();
   int m2 = _soil2.getMoisturePercent();
   int m3 = _soil3.getMoisturePercent();
@@ -816,6 +885,7 @@ void WebManager::handleGetStatus() {
   json += "\"cooldownRemainingMs\":" + String(cooldown) + ",";
   json += "\"wifiRssi\":" + String(rssi) + ",";
   json += "\"pumpDurationMs\":" + String(_pumpController.getRunDuration()) + ",";
+  json += "\"resetReason\":\"" + String(resetReasonName()) + "\",";
   json += "\"uptimeSec\":" + String(uptime);
   json += "}";
 
@@ -824,6 +894,7 @@ void WebManager::handleGetStatus() {
 }
 
 void WebManager::handlePostWater() {
+  markActivity();
   bool ok = _pumpController.requestWatering();
 
   String json = "{";
@@ -839,6 +910,7 @@ void WebManager::handlePostWater() {
 }
 
 void WebManager::handlePostSettings() {
+  markActivity();
   if (_server.hasArg("threshold")) {
     int val = _server.arg("threshold").toInt();
     if (val >= 5 && val <= 95) {
@@ -858,6 +930,8 @@ void WebManager::handlePostSettings() {
       _pumpController.setRunDuration((unsigned long)ms);
     }
   }
+
+  saveSettings();
 
   String json = "{\"success\":true,\"threshold\":" + String(_threshold) + 
                 ",\"autoWatering\":" + String(_autoWatering ? "true" : "false") +

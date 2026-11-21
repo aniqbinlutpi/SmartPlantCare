@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <esp_task_wdt.h>
 #include "Config.h"
 #include "SoilSensor.h"
 #include "PumpController.h"
@@ -21,6 +22,7 @@ WebManager     webMgr(WEB_SERVER_PORT, soil1, soil2, soil3, pump, dryThreshold, 
 
 unsigned long lastScreenUpdate = 0;
 const unsigned long SCREEN_INTERVAL = 500; // Update display every 500ms
+const uint32_t LOOP_WATCHDOG_MS = 30000;    // reboot if loop() stalls this long
 
 void setup() {
   Serial.begin(115200);
@@ -42,7 +44,10 @@ void setup() {
     Serial.println(F("[OLED] Warning: Display not found. Continuing in headless mode."));
   }
 
-  // 3. Connect to Wi-Fi and start Web Dashboard
+  // 3. Restore dashboard settings (threshold, auto, burst) saved in flash
+  webMgr.loadSettings();
+
+  // 4. Connect to Wi-Fi and start Web Dashboard
   bool wifiOk = webMgr.begin();
   if (wifiOk && displayMgr.isReady()) {
     displayMgr.showWifiConnected(webMgr.getLocalIP().c_str());
@@ -54,9 +59,27 @@ void setup() {
   Serial.print(F(" - http://"));
   Serial.print(MDNS_HOSTNAME);
   Serial.println(F(".local (mDNS)\n"));
+
+  // 5. Hardware watchdog: if loop() ever stops running for 30s, reboot.
+  esp_task_wdt_config_t wdt = {
+    .timeout_ms = LOOP_WATCHDOG_MS,
+    .idle_core_mask = 0,
+    .trigger_panic = true,
+  };
+  // The Arduino core normally starts the task watchdog already, so
+  // reconfigure it; only initialise it if it isn't running yet.
+  esp_err_t wdtErr = esp_task_wdt_reconfigure(&wdt);
+  if (wdtErr == ESP_ERR_INVALID_STATE) {
+    wdtErr = esp_task_wdt_init(&wdt);
+  }
+  esp_err_t addErr = esp_task_wdt_add(NULL);
+  Serial.printf("[WDT] Loop watchdog %lus: %s\n", (unsigned long)(LOOP_WATCHDOG_MS / 1000),
+                (wdtErr == ESP_OK && addErr == ESP_OK) ? "on" : "FAILED");
 }
 
 void loop() {
+  esp_task_wdt_reset();
+
   // 1. Update pump safety timer (non-blocking shut-off)
   pump.update();
 
